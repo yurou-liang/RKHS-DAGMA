@@ -86,11 +86,13 @@ class LBFGSBScipy(torch.optim.Optimizer):
         bounds = self._gather_flat_bounds()
 
         # Magic
+        options = {'ftol': 1e-06}
         sol = sopt.minimize(wrapped_closure,
                             initial_params,
                             method='L-BFGS-B',
                             jac=True,
-                            bounds=bounds)
+                            bounds=bounds,
+                            options=options)
 
         final_params = torch.from_numpy(sol.x)
         final_params = final_params.to(torch.get_default_dtype())
