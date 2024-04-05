@@ -1,2 +1,4 @@
 Algorithm/RKHS/RKHS_nonlinear.ipynb filter=lfs diff=lfs merge=lfs -text
 RKHS_nonlinear_sparsity.ipynb filter=lfs diff=lfs merge=lfs -text
+RKHS_nonlinear_sparsity_spetrum.ipynb filter=lfs diff=lfs merge=lfs -text
+RKHS_nonlinear_sparsity_log.ipynb filter=lfs diff=lfs merge=lfs -text
