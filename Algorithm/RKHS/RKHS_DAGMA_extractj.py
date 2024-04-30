@@ -9,129 +9,162 @@ from  torch import optim
 import copy
 
 
-torch.set_default_dtype(torch.float64)
-device= torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-torch.set_default_device(device)
+# torch.set_default_dtype(torch.float64)
+# device= torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# torch.set_default_device(device)
 
 
 class DagmaRKHS(nn.Module):
     """n: number of samples, d: num variables"""
-    def __init__(self, n, d, kernel):
+    def __init__(self, x: torch.tensor, gamma = 1):
         super(DagmaRKHS, self).__init__() # inherit  nn.Module
-        self.d = d
-        self.n = n
-        self.kernel = kernel
-
+        self.x = x
+        self.d = x.shape[1]
+        self.n = x.shape[0]
+        self.gamma = gamma
         # initialize coefficients alpha
-        alpha = torch.zeros(d, n)
+        alpha = torch.zeros(self.d, self.n)
         self.alpha = nn.Parameter(alpha) 
         # initialize coefficients beta
-        self.beta = nn.Parameter(torch.zeros(d, d, n))
+        self.beta = nn.Parameter(torch.zeros(self.d, self.d, self.n))
         
-        self.delta = torch.ones(d, d)
+        self.delta = torch.ones(self.d, self.d)
         self.delta.fill_diagonal_(0)
         self.I = torch.eye(self.d)
     
+
+        # x: [n, d]; K: [n, n]; grad_K1: [n, n, d]: gradient of k(x^i, x^l) wrt x^i_{k}; grad_K2: [n, n, d]: gradient of k(x^i, x^l) wrt x^l_{k}; mixed_grad: [n, n, d, d] gradient of k(x^i, x^l) wrt x^i_{a} and x^l_{b}
+        # Compute pairwise squared Euclidean distances using broadcasting
+        diff = self.x.unsqueeze(1) - self.x.unsqueeze(0) # [n, n, d]
+        print("x device: ", self.x.device)
+        print("diff device: ", diff.device)
+        print("delta device: ", self.delta.device)
+        sq_dist = torch.einsum('jk, ilk -> jil', self.delta, diff**2) # [d, n, n]
+
+        # Compute the Gaussian kernel matrix
+        self.K = torch.exp(-sq_dist / (self.gamma ** 2)) # [d, n, n] K[j, i, l] = k(x^i, x^l) without jth coordinate
+        
+        # Compute the gradient of K with respect to X
+        self.grad_K1 = -2 / (self.gamma ** 2) * torch.einsum('jil, ila -> jila', self.K, diff) # [d, n, n, d] 
+        identity_mask = torch.eye(self.d, dtype=torch.bool)
+        broadcastable_mask = identity_mask.view(self.d, 1, 1, self.d)
+        expanded_mask = broadcastable_mask.expand(-1, self.n, self.n, -1)
+        self.grad_K1[expanded_mask] = 0.0
+        self.grad_K2 = -self.grad_K1
+
+        outer_products_diff = torch.einsum('ila, ilb->ilab', diff, diff)  # Outer product of the differences [n, n, d, d]
+        self.mixed_grad = (-4 / self.gamma**4) * torch.einsum('jil, ilab -> jilab', self.K, outer_products_diff) # Apply the formula for a != b [d, n, n, d, d]
+
+        # Diagonal elements (i == j) need an additional term
+        K_expanded = torch.einsum('jil,ab->jilab', self.K, self.I) #[d, n, n, d, d]
+        self.mixed_grad += 2/self.gamma**2 * K_expanded
+
+        expanded_identity_mask1 = identity_mask.view(self.d, 1, 1, 1, self.d).expand(self.d, self.n, self.n, self.d, self.d)
+        expanded_identity_mask2 = identity_mask.view(self.d, 1, 1, self.d, 1).expand(self.d, self.n, self.n, self.d, self.d)
+
+        # # Zero out elements in A where the mask is True
+        self.mixed_grad[expanded_identity_mask1] = 0
+        self.mixed_grad[expanded_identity_mask2] = 0
     
     def get_parameters(self): # [d, n]
        alpha = self.alpha
        beta = self.beta
        return alpha, beta
     
-    @torch.no_grad()
-    def gaussian_kernel_matrix_and_grad(self, x, gamma=1): 
-      # x: [n, d]; K: [n, n]; grad_K1: [n, n, d]: gradient of k(x^i, x^l) wrt x^i_{k}; grad_K2: [n, n, d]: gradient of k(x^i, x^l) wrt x^l_{k}; mixed_grad: [n, n, d, d] gradient of k(x^i, x^l) wrt x^i_{a} and x^l_{b}
-      # Compute pairwise squared Euclidean distances using broadcasting
-      diff = x.unsqueeze(1) - x.unsqueeze(0) # [n, n, d]
-      sq_dist = torch.einsum('jk, ilk -> jil', self.delta, diff**2) # [d, n, n]
+    # @torch.no_grad()
+    # def gaussian_kernel_matrix_and_grad(self, x, gamma=1): 
+    #   # x: [n, d]; K: [n, n]; grad_K1: [n, n, d]: gradient of k(x^i, x^l) wrt x^i_{k}; grad_K2: [n, n, d]: gradient of k(x^i, x^l) wrt x^l_{k}; mixed_grad: [n, n, d, d] gradient of k(x^i, x^l) wrt x^i_{a} and x^l_{b}
+    #   # Compute pairwise squared Euclidean distances using broadcasting
+    #   diff = x.unsqueeze(1) - x.unsqueeze(0) # [n, n, d]
+    #   sq_dist = torch.einsum('jk, ilk -> jil', self.delta, diff**2) # [d, n, n]
 
-      # Compute the Gaussian kernel matrix
-      K = torch.exp(-sq_dist / (gamma ** 2)) # [d, n, n] K[j, i, l] = k(x^i, x^l) without jth coordinate
+    #   # Compute the Gaussian kernel matrix
+    #   K = torch.exp(-sq_dist / (gamma ** 2)) # [d, n, n] K[j, i, l] = k(x^i, x^l) without jth coordinate
       
-      # Compute the gradient of K with respect to X
-      grad_K1 = -2 / (gamma ** 2) * torch.einsum('jil, ila -> jila', K, diff) # [d, n, n, d] 
-      identity_mask = torch.eye(self.d, dtype=torch.bool)
-      broadcastable_mask = identity_mask.view(self.d, 1, 1, self.d)
-      expanded_mask = broadcastable_mask.expand(-1, self.n, self.n, -1)
-      grad_K1[expanded_mask] = 0.0
-      grad_K2 = -grad_K1
+    #   # Compute the gradient of K with respect to X
+    #   grad_K1 = -2 / (gamma ** 2) * torch.einsum('jil, ila -> jila', K, diff) # [d, n, n, d] 
+    #   identity_mask = torch.eye(self.d, dtype=torch.bool)
+    #   broadcastable_mask = identity_mask.view(self.d, 1, 1, self.d)
+    #   expanded_mask = broadcastable_mask.expand(-1, self.n, self.n, -1)
+    #   grad_K1[expanded_mask] = 0.0
+    #   grad_K2 = -grad_K1
 
-      outer_products_diff = torch.einsum('ila, ilb->ilab', diff, diff)  # Outer product of the differences [n, n, d, d]
-      mixed_grad = (-4 / gamma**4) * torch.einsum('jil, ilab -> jilab', K, outer_products_diff) # Apply the formula for a != b [d, n, n, d, d]
+    #   outer_products_diff = torch.einsum('ila, ilb->ilab', diff, diff)  # Outer product of the differences [n, n, d, d]
+    #   mixed_grad = (-4 / gamma**4) * torch.einsum('jil, ilab -> jilab', K, outer_products_diff) # Apply the formula for a != b [d, n, n, d, d]
 
-      # Diagonal elements (i == j) need an additional term
-      K_expanded = torch.einsum('jil,ab->jilab', K, self.I) #[d, n, n, d, d]
-      mixed_grad += 2/gamma**2 * K_expanded
+    #   # Diagonal elements (i == j) need an additional term
+    #   K_expanded = torch.einsum('jil,ab->jilab', K, self.I) #[d, n, n, d, d]
+    #   mixed_grad += 2/gamma**2 * K_expanded
 
-      expanded_identity_mask1 = identity_mask.view(self.d, 1, 1, 1, self.d).expand(self.d, self.n, self.n, self.d, self.d)
-      expanded_identity_mask2 = identity_mask.view(self.d, 1, 1, self.d, 1).expand(self.d, self.n, self.n, self.d, self.d)
+    #   expanded_identity_mask1 = identity_mask.view(self.d, 1, 1, 1, self.d).expand(self.d, self.n, self.n, self.d, self.d)
+    #   expanded_identity_mask2 = identity_mask.view(self.d, 1, 1, self.d, 1).expand(self.d, self.n, self.n, self.d, self.d)
 
-      # # Zero out elements in A where the mask is True
-      mixed_grad[expanded_identity_mask1] = 0
-      mixed_grad[expanded_identity_mask2] = 0
+    #   # # Zero out elements in A where the mask is True
+    #   mixed_grad[expanded_identity_mask1] = 0
+    #   mixed_grad[expanded_identity_mask2] = 0
 
-      return K, grad_K1, grad_K2, mixed_grad
+    #   return K, grad_K1, grad_K2, mixed_grad
     
     
-    @torch.no_grad()
-    def matern3_2_kernel_matrix_and_grad(self, x, gamma=1): # K: [n, n]; grad_K: [n, n, d]: gradient of k(x^l, x^i) wrt x^l_{a}
-       #x = torch.tensor(x, requires_grad=True)
-       diff = x.unsqueeze(1) - x.unsqueeze(0) #[n, n, d]
-       dist = torch.sqrt(torch.sum(diff ** 2, dim=2)) #[n, n]
-       K = (1 + np.sqrt(3)*dist / gamma)*torch.exp(-np.sqrt(3)*dist / gamma) #[n, n]
-       temp = -3/(gamma**2)*torch.exp(-np.sqrt(3)*dist/gamma) #[n, n]
-       grad_K = diff*temp.unsqueeze(2)
-       return K, grad_K
+    # @torch.no_grad()
+    # def matern3_2_kernel_matrix_and_grad(self, x, gamma=1): # K: [n, n]; grad_K: [n, n, d]: gradient of k(x^l, x^i) wrt x^l_{a}
+    #    #x = torch.tensor(x, requires_grad=True)
+    #    diff = x.unsqueeze(1) - x.unsqueeze(0) #[n, n, d]
+    #    dist = torch.sqrt(torch.sum(diff ** 2, dim=2)) #[n, n]
+    #    K = (1 + np.sqrt(3)*dist / gamma)*torch.exp(-np.sqrt(3)*dist / gamma) #[n, n]
+    #    temp = -3/(gamma**2)*torch.exp(-np.sqrt(3)*dist/gamma) #[n, n]
+    #    grad_K = diff*temp.unsqueeze(2)
+    #    return K, grad_K
     
-    @torch.no_grad()
-    def matern5_2_kernel_matrix_and_grad(self, x, gamma=1): # [n, n, d]: gradient of k(x^i, x^l) wrt x^i_{k}
-       #x = torch.tensor(x, requires_grad=True)
-       diff = x.unsqueeze(1) - x.unsqueeze(0) #[n, n, d]
-       dist = torch.sqrt(torch.sum(diff ** 2, dim=2)) #[n, n]
-       K = (1 + np.sqrt(5)*dist / gamma + 5*(dist**2)/(3*(gamma**2)))*torch.exp(-np.sqrt(5)*dist / gamma)
-       temp = (-5/(3*gamma**2) - 5*np.sqrt(5)*dist/(3*(gamma**3)))*torch.exp(-np.sqrt(5)*dist/gamma) #[n, n]
-       grad_K = diff*temp.unsqueeze(2)
+    # @torch.no_grad()
+    # def matern5_2_kernel_matrix_and_grad(self, x, gamma=1): # [n, n, d]: gradient of k(x^i, x^l) wrt x^i_{k}
+    #    #x = torch.tensor(x, requires_grad=True)
+    #    diff = x.unsqueeze(1) - x.unsqueeze(0) #[n, n, d]
+    #    dist = torch.sqrt(torch.sum(diff ** 2, dim=2)) #[n, n]
+    #    K = (1 + np.sqrt(5)*dist / gamma + 5*(dist**2)/(3*(gamma**2)))*torch.exp(-np.sqrt(5)*dist / gamma)
+    #    temp = (-5/(3*gamma**2) - 5*np.sqrt(5)*dist/(3*(gamma**3)))*torch.exp(-np.sqrt(5)*dist/gamma) #[n, n]
+    #    grad_K = diff*temp.unsqueeze(2)
        
-       return K, grad_K
+    #    return K, grad_K
     
-    def forward(self, x: torch.tensor): #[n, d] -> [n, d], forward(x)_{i,j} = estimation of x_j at ith observation 
+    def forward(self): #[n, d] -> [n, d], forward(x)_{i,j} = estimation of x_j at ith observation 
       """
       x: data matrix of shape [n, d] (np.array)
       forward(x)_{l,j} = estimation of x_j at lth observation
       """
-      if self.kernel == "gaussian":
-        K = self.gaussian_kernel_matrix_and_grad(x)[0]
-        grad_K2 = self.gaussian_kernel_matrix_and_grad(x)[2]
-      elif self.kernel == "matern3_2":
-        K = self.matern3_2_kernel_matrix_and_grad(x)[0]
-        grad_K2 = self.matern3_2_kernel_matrix_and_grad(x)[2]
-      elif self.kernel == "matern5_2":
-        K = self.matern5_2_kernel_matrix_and_grad(x)[0]
-        grad_K2 = self.matern5_2_kernel_matrix_and_grad(x)[2]
-      else:
-        print("Given kernel is invalid.")
-      beta = self.get_parameters()[1]  
-      output1 = torch.einsum('jl, jil -> ij', self.alpha, K) # [n, d]
-      output2 = torch.einsum('jal, jila -> ijl', beta, grad_K2) # [n, d, n]
+    #   if self.kernel == "gaussian":
+    #     K = self.gaussian_kernel_matrix_and_grad(x)[0]
+    #     grad_K2 = self.gaussian_kernel_matrix_and_grad(x)[2]
+    #   elif self.kernel == "matern3_2":
+    #     K = self.matern3_2_kernel_matrix_and_grad(x)[0]
+    #     grad_K2 = self.matern3_2_kernel_matrix_and_grad(x)[2]
+    #   elif self.kernel == "matern5_2":
+    #     K = self.matern5_2_kernel_matrix_and_grad(x)[0]
+    #     grad_K2 = self.matern5_2_kernel_matrix_and_grad(x)[2]
+    #   else:
+    #     print("Given kernel is invalid.")
+    #  beta = self.get_parameters()[1]  
+      output1 = torch.einsum('jl, jil -> ij', self.alpha, self.K) # [n, d]
+      output2 = torch.einsum('jal, jila -> ijl', self.beta, self.grad_K2) # [n, d, n]
       output2 = torch.sum(output2, dim = 2) # [n, d]
       output = output1 + output2 # [n, d]
       return output
 
 
-    def fc1_to_adj(self, x: torch.tensor) -> torch.Tensor: # [d, d]
-      if self.kernel == "gaussian":
-        grad_K1 = self.gaussian_kernel_matrix_and_grad(x)[1] # [n, n, d]
-        mixed_grad = self.gaussian_kernel_matrix_and_grad(x)[3] # [n, n, d, d]
-      elif self.kernel == "matern3_2":
-        grad_K1 = self.matern3_2_kernel_matrix_and_grad(x)[1]
-      elif self.kernel == "matern5_2":
-        grad_K1 = self.matern5_2_kernel_matrix_and_grad(x)[1]
-      else:
-        print("Given kernel is invalid.")
+    def fc1_to_adj(self) -> torch.Tensor: # [d, d]
+    #   if self.kernel == "gaussian":
+    #     grad_K1 = self.gaussian_kernel_matrix_and_grad(x)[1] # [n, n, d]
+    #     mixed_grad = self.gaussian_kernel_matrix_and_grad(x)[3] # [n, n, d, d]
+    #   elif self.kernel == "matern3_2":
+    #     grad_K1 = self.matern3_2_kernel_matrix_and_grad(x)[1]
+    #   elif self.kernel == "matern5_2":
+    #     grad_K1 = self.matern5_2_kernel_matrix_and_grad(x)[1]
+    #   else:
+    #     print("Given kernel is invalid.")
 
-      weight1 = torch.einsum('jl, jilk -> kij', self.alpha, grad_K1) # [d, n, d]
-      beta = self.get_parameters()[1]  
-      weight2 = torch.einsum('jal, jilka -> kij', beta, mixed_grad) # [d, n, d]
+      weight1 = torch.einsum('jl, jilk -> kij', self.alpha, self.grad_K1) # [d, n, d]
+      #beta = self.get_parameters()[1]  
+      weight2 = torch.einsum('jal, jilka -> kij', self.beta, self.mixed_grad) # [d, n, d]
       weight = weight1 + weight2
       weight = torch.sum(weight ** 2, dim = 1)/self.n # [d, d]
 
@@ -144,9 +177,9 @@ class DagmaRKHS(nn.Module):
     #   return h
     
     # log determinant h
-    def h_func(self, x: torch.tensor, s: torch.tensor):
+    def h_func(self, weight: torch.tensor, s: torch.tensor):
       s = torch.tensor(s, dtype=torch.float64)
-      weight = self.fc1_to_adj(x)
+      #weight = self.fc1_to_adj(x)
       #print("weight:", weight)
       A = s*self.I - weight
       sign, logabsdet = torch.linalg.slogdet(A)
@@ -154,6 +187,7 @@ class DagmaRKHS(nn.Module):
       h = -logabsdet + self.d * torch.log(s)
       #print("h: ", h)
       return h
+      #return torch.tensor([0])
 
     #spetrum h
     # def h_func(self, x: torch.tensor):
@@ -165,34 +199,39 @@ class DagmaRKHS(nn.Module):
     #   return w @ weight @ w
     
 
-    def L_risk(self, x: torch.tensor, lambda1, tau): # [1, 1]
+    def mse(self, x_est: torch.tensor): # [1, 1]
       """compute the regularized iempirical L_risk of squared loss function, penalty: penalty for H_norm"""
-      if self.kernel == "gaussian":
-          K = self.gaussian_kernel_matrix_and_grad(x)[0] # [n, n]
-          mixed_grad = self.gaussian_kernel_matrix_and_grad(x)[3] # [n, n, d, d]
-          K_grad2 = self.gaussian_kernel_matrix_and_grad(x)[2] # [n, n, d]
-      elif self.kernel == "matern3_2":
-          K = self.matern3_2_kernel_matrix_and_grad(x)[0] # [n, n]
-      elif self.kernel == "matern5_2":
-          K = self.matern5_2_kernel_matrix_and_grad(x)[0] # [n, n]
-      else:
-          print("Given kernel is invalid.") 
-      beta = self.get_parameters()[1]  
-      x_est = self.forward(x) # [n, d]
-      squared_loss = 0.5 / self.n * torch.sum((x_est - x) ** 2)
-      temp1 = torch.einsum('ji, jil -> jl', self.alpha, K) #[d, n]
+      #x_est = self.forward(x) # [n, d]
+      squared_loss = 0.5 / self.n * torch.sum((x_est - self.x) ** 2)
+      return squared_loss
+    
+    def complexity_reg(self, lambda1, tau):
+    #   if self.kernel == "gaussian":
+    #       K = self.gaussian_kernel_matrix_and_grad(x)[0] # [n, n]
+    #       mixed_grad = self.gaussian_kernel_matrix_and_grad(x)[3] # [n, n, d, d]
+    #       K_grad2 = self.gaussian_kernel_matrix_and_grad(x)[2] # [n, n, d]
+    #   elif self.kernel == "matern3_2":
+    #       K = self.matern3_2_kernel_matrix_and_grad(x)[0] # [n, n]
+    #   elif self.kernel == "matern5_2":
+    #       K = self.matern5_2_kernel_matrix_and_grad(x)[0] # [n, n]
+    #   else:
+    #       print("Given kernel is invalid.") 
+    #   beta = self.get_parameters()[1]  
+      temp1 = torch.einsum('ji, jil -> jl', self.alpha, self.K) #[d, n]
       temp1 = (self.alpha*temp1).sum() 
-      temp2 = torch.einsum('jal, jila -> ji', beta, K_grad2) #[d, n]
+      temp2 = torch.einsum('jal, jila -> ji', self.beta, self.grad_K2) #[d, n]
       temp2 = (self.alpha * temp2).sum()
-      temp3 = torch.einsum('jbl, jilab -> jai', beta, mixed_grad) #[d, d, n]
-      temp3 = (beta * temp3).sum()
-      regularized = lambda1*(temp1 + temp2 + temp3)
-      W = self.fc1_to_adj(x)
+      temp3 = torch.einsum('jbl, jilab -> jai', self.beta, self.mixed_grad) #[d, d, n]
+      temp3 = (self.beta * temp3).sum()
+      regularized = lambda1*tau*(temp1 + temp2 + temp3)
+      return regularized
+    
+    def sparsity_reg(self, weight: torch.tensor, tau):
+      #W = self.fc1_to_adj(x)
       help = torch.tensor(1e-8) # numerical stability
-      W_sqrt = torch.sqrt(W+help)
+      W_sqrt = torch.sqrt(weight+help)
       sparsity = torch.sum(W_sqrt)
-      loss = squared_loss + tau*(regularized + 2*sparsity)
-      return loss
+      return 2*tau*sparsity
     
 
 class DagmaRKHS_nonlinear:
@@ -281,17 +320,22 @@ class DagmaRKHS_nonlinear:
         obj_prev = 1e16
         for i in range(max_iter):
             optimizer.zero_grad()
-            h_val = self.model.h_func(self.X, s)
-            #print("h_val: ", h_val.device, h_val.dtype)
+            weight = self.model.fc1_to_adj()
+            print("weight: ", weight)
+            h_val = self.model.h_func(weight, s)
             if h_val.item() < 0:
                 self.vprint(f'Found h negative {h_val.item()} at iter {i}')
                 return False
-            score = self.model.L_risk(self.X, lambda1, tau)
-            print("squared loss: ", score)
-            print("mu: ", mu)
-            print("h_val: ", h_val)
+            x_est = self.model.forward()
+            squared_loss = self.model.mse(x_est)
+            complexity_reg = self.model.complexity_reg(lambda1, tau)
+            sparsity_reg = self.model.sparsity_reg(weight, tau) 
+            score = squared_loss + complexity_reg + sparsity_reg
+            # print("squared loss: ", score)
+            # print("mu: ", mu)
+            # print("h_val: ", h_val)
             obj = mu * score + h_val
-            print("obj: ", obj)
+            #print("obj: ", obj)
             obj.backward()
             optimizer.step()
             if lr_decay and (i+1) % 1000 == 0: #every 1000 iters reduce lr
@@ -398,10 +442,10 @@ class DagmaRKHS_nonlinear:
                             break # lr is too small
                         s_cur = 1
                 mu *= mu_factor
-        W_est = self.model.fc1_to_adj(self.X)
+        W_est = self.model.fc1_to_adj()
         W_est = torch.sqrt(W_est)
         W_est = W_est.cpu().detach().numpy()
-        print(W_est)
+        #print(W_est)
         W_est[np.abs(W_est) < w_threshold] = 0
-        output = self.model.forward(self.X)
+        output = self.model.forward()
         return W_est, output

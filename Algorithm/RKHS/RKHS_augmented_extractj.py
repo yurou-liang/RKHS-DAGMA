@@ -158,8 +158,13 @@ class NotearsRKHS(nn.Module):
     #   return w @ weight @ w 
     
 
-    def L_risk(self, x: torch.tensor, lambda1, tau): # [1, 1]
+    def mse(self, x: torch.tensor): # [1, 1]
       """compute the regularized iempirical L_risk of squared loss function, penalty: penalty for H_norm"""
+      x_est = self.forward(x) # [n, d]
+      squared_loss = 0.5 / self.n * torch.sum((x_est - x) ** 2)
+      return squared_loss
+    
+    def complexity_reg(self, x: torch.tensor, lambda1, tau):
       if self.kernel == "gaussian":
           K = self.gaussian_kernel_matrix_and_grad(x)[0] # [n, n]
           mixed_grad = self.gaussian_kernel_matrix_and_grad(x)[3] # [n, n, d, d]
@@ -171,21 +176,21 @@ class NotearsRKHS(nn.Module):
       else:
           print("Given kernel is invalid.") 
       beta = self.get_parameters()[1]  
-      x_est = self.forward(x) # [n, d]
-      squared_loss = 0.5 / self.n * torch.sum((x_est - x) ** 2)
       temp1 = torch.einsum('ji, jil -> jl', self.alpha, K) #[d, n]
       temp1 = (self.alpha*temp1).sum() 
       temp2 = torch.einsum('jal, jila -> ji', beta, K_grad2) #[d, n]
       temp2 = (self.alpha * temp2).sum()
       temp3 = torch.einsum('jbl, jilab -> jai', beta, mixed_grad) #[d, d, n]
       temp3 = (beta * temp3).sum()
-      regularized = lambda1*(temp1 + temp2 + temp3)
+      regularized = lambda1*tau*(temp1 + temp2 + temp3)
+      return regularized
+    
+    def sparsity_reg(self, x: torch.tensor, tau):
       W = self.fc1_to_adj(x)
       help = torch.tensor(1e-8) # numerical stability
       W_sqrt = torch.sqrt(W+help)
       sparsity = torch.sum(W_sqrt)
-      loss = squared_loss + tau*(regularized + 2*sparsity)
-      return loss
+      return 2*tau*sparsity
     
 
     
@@ -201,12 +206,14 @@ def dual_ascent_step(model, X, lambda1, tau, rho, mu, h, rho_max):
             h_val = model.h_func(x_torch)
             print("h_val: ", h_val)
             penalty = 0.5 * rho * h_val * h_val + mu * h_val
-            L_risk = model.L_risk(x_torch, lambda1=lambda1, tau = tau)
-            loss = L_risk + penalty
-            print('squared loss:', L_risk.item())
-            print('loss:', loss.item())
-            loss.backward()
-            return loss
+            squared_loss = model.mse(x_torch)
+            complexity_reg = model.complexity_reg(x_torch, lambda1, tau)
+            sparsity_reg = model.sparsity_reg(x_torch, tau) 
+            obj = squared_loss + complexity_reg + sparsity_reg + penalty
+            print('squared loss:', squared_loss.item())
+            print('obj:', obj.item())
+            obj.backward()
+            return obj
 
         optimizer.step(closure)
         h_new = model.h_func(x_torch).item()
@@ -240,8 +247,8 @@ def RKHS_nonlinear(model: nn.Module,
     W_est = model.fc1_to_adj(x_torch)
     W_est = torch.sqrt(W_est)
     W_est = W_est.detach().numpy()
-    print(W_est)
+    #print(W_est)
     W_est[np.abs(W_est) < w_threshold] = 0
-    W_est[np.abs(W_est) >= w_threshold] = 1
+    #W_est[np.abs(W_est) >= w_threshold] = 1
     output = model.forward(x_torch)
     return W_est, output
