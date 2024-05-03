@@ -1,6 +1,6 @@
-from notears.locally_connected import LocallyConnected
-from notears.lbfgsb_scipy import LBFGSBScipy
-from notears.trace_expm import trace_expm
+from ..notears.locally_connected import LocallyConnected
+from ..notears.lbfgsb_scipy import LBFGSBScipy
+from ..notears.trace_expm import trace_expm
 import torch
 import torch.nn as nn
 import numpy as np
@@ -11,13 +11,12 @@ class NotearsMLP(nn.Module):
     def __init__(self, dims, bias=True):
         super(NotearsMLP, self).__init__()
         assert len(dims) >= 2
-        assert dims[-1] == 1 # output dim of last layer must be 1
+        assert dims[-1] == 1
         d = dims[0]
         self.dims = dims
         # fc1: variable splitting for l1
         self.fc1_pos = nn.Linear(d, d * dims[1], bias=bias)
         self.fc1_neg = nn.Linear(d, d * dims[1], bias=bias)
-        
         self.fc1_pos.weight.bounds = self._bounds()
         self.fc1_neg.weight.bounds = self._bounds()
         # fc2: local linear layers
@@ -33,20 +32,18 @@ class NotearsMLP(nn.Module):
             for m in range(self.dims[1]):
                 for i in range(d):
                     if i == j:
-                        bound = (0, 0) # self loop not allowed
+                        bound = (0, 0)
                     else:
                         bound = (0, None)
                     bounds.append(bound)
         return bounds
 
     def forward(self, x):  # [n, d] -> [n, d]
-        x = self.fc1_pos(x) - self.fc1_neg(x)  # [n, d * m1] pass linear layer through input x
-        print(x.shape)
+        x = self.fc1_pos(x) - self.fc1_neg(x)  # [n, d * m1]
         x = x.view(-1, self.dims[0], self.dims[1])  # [n, d, m1]
         for fc in self.fc2:
             x = torch.sigmoid(x)  # [n, d, m1]
             x = fc(x)  # [n, d, m2]
-            print(x.shape)
         x = x.squeeze(dim=2)  # [n, d]
         return x
 
@@ -209,8 +206,10 @@ def notears_nonlinear(model: nn.Module,
         if h <= h_tol or rho >= rho_max:
             break
     W_est = model.fc1_to_adj()
+    X_torch = torch.from_numpy(X)
+    output = model.forward(X_torch)
     W_est[np.abs(W_est) < w_threshold] = 0
-    return W_est
+    return W_est, output
 
 
 def main():
