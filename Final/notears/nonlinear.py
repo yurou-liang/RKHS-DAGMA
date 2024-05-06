@@ -1,6 +1,6 @@
-from ..notears.locally_connected import LocallyConnected
-from ..notears.lbfgsb_scipy import LBFGSBScipy
-from ..notears.trace_expm import trace_expm
+from .locally_connected import LocallyConnected
+from .lbfgsb_scipy import LBFGSBScipy
+from .trace_expm import trace_expm
 import torch
 import torch.nn as nn
 import numpy as np
@@ -132,7 +132,7 @@ class NotearsSobolev(nn.Module):
         fc1_weight = self.fc1_pos.weight - self.fc1_neg.weight  # [j, ik]
         fc1_weight = fc1_weight.view(self.d, self.d, self.k)  # [j, i, k]
         A = torch.sum(fc1_weight * fc1_weight, dim=2).t()  # [i, j]
-        h = trace_expm(A) - d  # (Zheng et al. 2018)
+        h = trace_expm(A) - self.d  # (Zheng et al. 2018)
         # A different formulation, slightly faster at the cost of numerical stability
         # M = torch.eye(self.d) + A / self.d  # (Yu et al. 2019)
         # E = torch.matrix_power(M, self.d - 1)
@@ -173,7 +173,10 @@ def dual_ascent_step(model, X, lambda1, lambda2, rho, alpha, h, rho_max):
             optimizer.zero_grad()
             X_hat = model(X_torch)
             loss = squared_loss(X_hat, X_torch)
+            #print('loss: ', loss)
             h_val = model.h_func()
+            #print("rho: ", rho)
+            #print("h_val: ", h_val)
             penalty = 0.5 * rho * h_val * h_val + alpha * h_val
             l2_reg = 0.5 * lambda2 * model.l2_reg()
             l1_reg = lambda1 * model.fc1_l1_reg()

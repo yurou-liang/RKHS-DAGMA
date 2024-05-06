@@ -1,4 +1,4 @@
-from ..RKHS import RKHS_DAGMA_extractj
+from RKHS import RKHS_DAGMA_extractj
 import torch
 import time
 import numpy as np
@@ -18,7 +18,7 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
     url = 'https://webdav.tuebingen.mpg.de/cause-effect/pair' + str(index).zfill(4) + '.txt'
     response = requests.get(url)
 
-    os.chdir('./Final/Tuebingen')
+    os.chdir('./Tuebingen')
     causality_df = pd.read_csv('causality_df.csv')
     index_list = causality_df['index'].tolist()
 
@@ -40,9 +40,37 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
         df['Y'] = scaler.fit_transform(df[['Y']])
         # Convert the DataFrame into a NumPy array
         data_array = df.to_numpy()
-    
+        if len(data_array) > 400:
+            data_array_sorted = data_array[data_array[:, 0].argsort()]
+            num_points = len(data_array_sorted) // 300
+
+            # Initialize the result array
+            result_array = np.zeros((300, 2))
+
+            # Process each grid
+            for i in range(300):
+                # Start and end indices of the grid
+                start = i * num_points
+                end = start + num_points if i < 299 else len(data_array_sorted)  # Adjust last grid to include remainder
+                
+                # Calculate the median of x1 in this grid
+                median_x1 = np.median(data_array_sorted[start:end, 0])
+                
+                # We'll take the x2 value corresponding to the median x1 index
+                median_index = start + (end - start) // 2
+                corresponding_x2 = data_array_sorted[median_index, 1]
+                
+                # Store in result
+                result_array[i, 0] = median_x1
+                result_array[i, 1] = corresponding_x2
+        else:
+            result_array = data_array
+
         # Now 'array' is a NumPy array with the data from the text file
-        X = torch.tensor(data_array)
+        X = torch.tensor(result_array)
+        x = result_array[:, 0]
+        y = result_array[:, 1]
+        print(X.shape)
     else:
         raise ValueError(f'Failed to retrieve the file: Status code {response.status_code}')
 
@@ -81,8 +109,8 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
 
     y_hat = output[:, 1].cpu().detach().numpy()
     plt.figure(figsize=(10, 6))  # Optional: specifies the figure size
-    plt.scatter(df.iloc[:, 0], df.iloc[:, 1], label='y', color='blue', marker='o')  # Plot x vs. y1
-    plt.scatter(df.iloc[:, 0], y_hat, label='y_est', color='red', marker='s') 
+    plt.scatter(x, y, label='y', color='blue', marker='o')  # Plot x vs. y1
+    plt.scatter(x, y_hat, label='y_est', color='red', marker='s') 
     plt.xlabel('x')
     plt.ylabel('y')
     plt.legend()
