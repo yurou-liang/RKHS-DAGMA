@@ -32,7 +32,8 @@ def RKHS_test(lambda1, tau, X, device, B_true, gamma, function_type, d, seed, th
     diff = np.linalg.norm(W_est - abs(B_true))
     x_est = eq_model.forward()
     mse = eq_model.mse(x_est).detach().cpu().numpy()
-    h_val = eq_model.h_func(W_est_no_thresh, s=1).detach().cpu().numpy()
+    W_est = eq_model.fc1_to_adj()
+    h_val = eq_model.h_func(W_est, s=1).detach().cpu().numpy()
     filename = f'RKHS_function_type{function_type}_d{d}_seed{seed}'
     results = {
     'SHD': acc['shd'],
