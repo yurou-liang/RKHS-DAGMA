@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     parser.add_argument('-d', '--num_nodes', nargs='+', default=[10, 20, 30, 40], type=int)
     parser.add_argument('-ER_order', default=4, type=int)
-    parser.add_argument('-gamma', default=1, type=int)
+    parser.add_argument('-gamma', default=None, type=int)
     parser.add_argument('-l', '--lambda1', default=1e-3, type=float)
     parser.add_argument('-t', '--tau', default=1e-4, type=float)
     parser.add_argument('-T', '--num_iterations', default=6, type=int)
@@ -142,8 +142,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    #device = torch.device(args.device)
-
     torch.set_default_dtype(torch.double)
     utils.set_random_seed(args.random_seed)
     torch.manual_seed(args.random_seed)
@@ -155,8 +153,11 @@ if __name__ == "__main__":
         print('-----------------------------\n' +
               f'| Experiments with {n_nodes} Nodes |\n' +
               '-----------------------------\n')
+        if args.gamma is None:
+            args.gamma = 0.4 * n_nodes
+
         for function_type in args.function_type:
-            print('>>> Generating Data <<<')
+            print(f'>>> Generating Data with function type {function_type} <<<')
             n, d, s0, graph_type, sem_type = 100, n_nodes, n_nodes * args.ER_order, 'ER', function_type 
             B_true = utils.simulate_dag(d, s0, graph_type)
             X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
@@ -179,5 +180,5 @@ if __name__ == "__main__":
                 print('>>> Performing LINEAR_NOTEARS discovery <<<')
                 LINEAR_NOTEARS(X = X, function_type = args.function_type, d = n_nodes, seed = args.random_seed)    
             else:
-                print("given algorithm is not valid.")
+                print("Given algorithm is not valid.")
             
