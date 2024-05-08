@@ -42,7 +42,7 @@ def RKHS_test(lambda1, tau, X, device, B_true, gamma, function_type, d, seed, th
     'diff': diff,
     'mse': mse.item(),
     'h_val': h_val.item(),
-    'start mse': start_mse,
+    'start mse': start_mse.tolist(),
     'W_est_no_thresh': W_est_no_thresh.tolist()}
 
     with open(filename, 'w') as file:
