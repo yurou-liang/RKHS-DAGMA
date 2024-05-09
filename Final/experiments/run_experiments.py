@@ -34,7 +34,7 @@ def RKHS_test(lambda1, tau, X, device, B_true, gamma, function_type, d, seed, th
     mse = eq_model.mse(x_est).detach().cpu().numpy()
     W_est = eq_model.fc1_to_adj()
     h_val = eq_model.h_func(W_est, s=1).detach().cpu().numpy()
-    filename = f'RKHS_function_type{function_type}_d{d}_seed{seed}'
+    filename = f'RKHS_function_type_{function_type}_d{d}_seed{seed}'
     results = {
     'SHD': acc['shd'],
     'TPR': acc['tpr'],
@@ -43,7 +43,9 @@ def RKHS_test(lambda1, tau, X, device, B_true, gamma, function_type, d, seed, th
     'mse': mse.item(),
     'h_val': h_val.item(),
     'start mse': start_mse.tolist(),
-    'W_est_no_thresh': W_est_no_thresh.tolist()}
+    'W_est_no_thresh': W_est_no_thresh.tolist(),
+    'B_true': B_true.tolist(),
+    'X': X.detach().cpu().numpy().tolist()}
 
     with open(filename, 'w') as file:
         json.dump(results, file, indent=4) 
@@ -57,7 +59,7 @@ def squared_loss(output, target):
     return loss
 
 
-def NOTEARS_MLP(X, function_type, d, seed):
+def NOTEARS_MLP(X, B_true, function_type, d, seed):
     results = {}
     model = NotearsMLP(dims=[d, 10, 1], bias=True)
     W_est, output = notears_nonlinear(model, X, lambda1=2e-2)
@@ -67,7 +69,7 @@ def NOTEARS_MLP(X, function_type, d, seed):
     x_est = model.forward(X_torch)
     mse = squared_loss(x_est, X_torch)
     h_val = model.h_func().detach().cpu().numpy()
-    filename = f'NOTEARS_MLP_function_type{function_type}_d{d}_seed{seed}'
+    filename = f'NOTEARS_MLP_function_type_{function_type}_d{d}_seed{seed}'
     results = {
     'SHD': acc['shd'],
     'TPR': acc['tpr'],
@@ -75,13 +77,15 @@ def NOTEARS_MLP(X, function_type, d, seed):
     'diff': diff,
     'mse': mse.item(),
     'h_val': h_val.item(),
-    'W_est': W_est.tolist()}
+    'W_est': W_est.tolist(),
+    'B_true': B_true.tolist(),
+    'X': X.tolist()}
 
     with open(filename, 'w') as file:
         json.dump(results, file, indent=4) 
 
 
-def NOTEARS_SOB(X, function_type, d, seed):
+def NOTEARS_SOB(X, B_true, function_type, d, seed):
     results = {}
     model = NotearsSobolev(d = d, k = 10)
     W_est, output = notears_nonlinear(model, X, lambda1=2e-2)
@@ -91,7 +95,7 @@ def NOTEARS_SOB(X, function_type, d, seed):
     x_est = model.forward(X_torch)
     mse = squared_loss(x_est, X_torch)
     h_val = model.h_func().detach().cpu().numpy()
-    filename = f'NOTEARS_SOB_function_type{function_type}_d{d}_seed{seed}'
+    filename = f'NOTEARS_SOB_function_type_{function_type}_d{d}_seed{seed}'
     results = {
     'SHD': acc['shd'],
     'TPR': acc['tpr'],
@@ -99,24 +103,28 @@ def NOTEARS_SOB(X, function_type, d, seed):
     'diff': diff,
     'mse': mse.item(),
     'h_val': h_val.item(),
-    'W_est': W_est.tolist()}
+    'W_est': W_est.tolist(),
+    'B_true': B_true.tolist(),
+    'X': X.tolist()}
 
     with open(filename, 'w') as file:
         json.dump(results, file, indent=4) 
 
 
-def LINEAR_NOTEARS(X, function_type, d, seed):
+def LINEAR_NOTEARS(X, B_true, function_type, d, seed):
     results = {}
     W_est = notears_linear(X, lambda1=0.1, loss_type = 'l2')
     acc = utils.count_accuracy(B_true, W_est != 0)
     diff = np.linalg.norm(W_est - abs(B_true))
-    filename = f'LINEAR_NOTEARS_function_type{function_type}_d{d}_seed{seed}'
+    filename = f'LINEAR_NOTEARS_function_type_{function_type}_d{d}_seed{seed}'
     results = {
     'SHD': acc['shd'],
     'TPR': acc['tpr'],
     'F1': acc['f1'],
     'diff': diff,
-    'W_est': W_est.tolist()}
+    'W_est': W_est.tolist(),
+    'B_true': B_true.tolist(),
+    'X': X.tolist()}
 
     with open(filename, 'w') as file:
         json.dump(results, file, indent=4) 
@@ -143,8 +151,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     torch.set_default_dtype(torch.double)
-    utils.set_random_seed(args.random_seed)
-    torch.manual_seed(args.random_seed)
 
     torch.backends.cudnn.benchmark = False
     os.chdir('./experiments')
@@ -154,11 +160,13 @@ if __name__ == "__main__":
               f'| Experiments with {n_nodes} Nodes |\n' +
               '-----------------------------\n')
         if args.gamma is None:
-            args.gamma = 0.4 * n_nodes
+            gamma = 0.4 * n_nodes
 
         for function_type in args.function_type:
             print(f'>>> Generating Data with function type {function_type} <<<')
             n, d, s0, graph_type, sem_type = 100, n_nodes, n_nodes * args.ER_order, 'ER', function_type 
+            utils.set_random_seed(args.random_seed)
+            torch.manual_seed(args.random_seed)
             B_true = utils.simulate_dag(d, s0, graph_type)
             X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
             X_torch = torch.from_numpy(X)
@@ -166,19 +174,19 @@ if __name__ == "__main__":
                 device= torch.device('cuda' if torch.cuda.is_available() else 'cpu')
                 torch.set_default_device(device)
                 print('>>> Performing DAGMA-RKHS discovery <<<')
-                RKHS_test(lambda1 = args.lambda1, tau = args.tau, X = X_torch, device=device, B_true = B_true, gamma= args.gamma, function_type = args.function_type, 
+                RKHS_test(lambda1 = args.lambda1, tau = args.tau, X = X_torch, device=device, B_true = B_true, gamma= gamma, function_type = function_type, 
                         d = n_nodes, seed = args.random_seed, thresh = args.thresh, T=args.num_iterations, lr = args.lr)
             elif args.algorithm == "NOTEARS_MLP":
                 print('>>> Performing NOTEARS_MLP discovery <<<')
-                NOTEARS_MLP(X = X, function_type = args.function_type, d = n_nodes, seed = args.random_seed)
+                NOTEARS_MLP(X = X, B_true = B_true, function_type = args.function_type, d = n_nodes, seed = args.random_seed)
 
             elif args.algorithm == "NOTEARS_SOB":
                 print('>>> Performing NOTEARS_SOB discovery <<<')
-                NOTEARS_SOB(X = X, function_type = args.function_type, d = n_nodes, seed = args.random_seed)
+                NOTEARS_SOB(X = X, B_true = B_true, function_type = args.function_type, d = n_nodes, seed = args.random_seed)
 
             elif args.algorithm == "LINEAR_NOTEARS":
                 print('>>> Performing LINEAR_NOTEARS discovery <<<')
-                LINEAR_NOTEARS(X = X, function_type = args.function_type, d = n_nodes, seed = args.random_seed)    
+                LINEAR_NOTEARS(X = X, B_true = B_true, function_type = args.function_type, d = n_nodes, seed = args.random_seed)  
             else:
                 print("Given algorithm is not valid.")
             
