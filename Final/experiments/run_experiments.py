@@ -170,6 +170,12 @@ if __name__ == "__main__":
             B_true = utils.simulate_dag(d, s0, graph_type)
             X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
             X_torch = torch.from_numpy(X)
+            test = {"B_true": B_true.tolist(),
+                    "X": X.tolist()}
+            filename = f"test_d{n_nodes}_{function_type}"
+            with open(filename, 'w') as file:
+                json.dump(test, file, indent=4)
+            continue
             if args.algorithm == "RKHS":
                 device= torch.device('cuda' if torch.cuda.is_available() else 'cpu')
                 torch.set_default_device(device)
