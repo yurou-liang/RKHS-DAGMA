@@ -66,7 +66,7 @@ def process_pair_NOTEARS_MLP(tuple):
 def NOTEARS_SOB(X, B_true, function_type, d, seed):
     results = {}
     model = NotearsSobolev(d = d, k = 10)
-    W_est, output = notears_nonlinear(model, X, lambda1=2e-2)
+    W_est, output = notears_nonlinear(model, X, lambda1=3e-2)
     acc = utils.count_accuracy(B_true, W_est != 0)
     diff = np.linalg.norm(W_est - abs(B_true))
     X_torch = torch.from_numpy(X)

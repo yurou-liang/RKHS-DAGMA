@@ -1,10 +1,6 @@
 from experiments import utils
 from RKHS import RKHS_DAGMA_extractj
 import sys
-# module_path = './notears'
-# if module_path not in sys.path:
-#     sys.path.append(module_path)
-#from notears import nonlinear
 from notears import NotearsMLP, notears_nonlinear, NotearsSobolev, notears_linear
 import torch
 import numpy as np
@@ -88,7 +84,7 @@ def NOTEARS_MLP(X, B_true, function_type, d, seed):
 def NOTEARS_SOB(X, B_true, function_type, d, seed):
     results = {}
     model = NotearsSobolev(d = d, k = 10)
-    W_est, output = notears_nonlinear(model, X, lambda1=2e-2)
+    W_est, output = notears_nonlinear(model, X, lambda1=3e-2)
     acc = utils.count_accuracy(B_true, W_est != 0)
     diff = np.linalg.norm(W_est - abs(B_true))
     X_torch = torch.from_numpy(X)
@@ -178,15 +174,15 @@ if __name__ == "__main__":
                         d = n_nodes, seed = args.random_seed, thresh = args.thresh, T=args.num_iterations, lr = args.lr)
             elif args.algorithm == "NOTEARS_MLP":
                 print('>>> Performing NOTEARS_MLP discovery <<<')
-                NOTEARS_MLP(X = X, B_true = B_true, function_type = args.function_type, d = n_nodes, seed = args.random_seed)
+                NOTEARS_MLP(X = X, B_true = B_true, function_type = function_type, d = n_nodes, seed = args.random_seed)
 
             elif args.algorithm == "NOTEARS_SOB":
                 print('>>> Performing NOTEARS_SOB discovery <<<')
-                NOTEARS_SOB(X = X, B_true = B_true, function_type = args.function_type, d = n_nodes, seed = args.random_seed)
+                NOTEARS_SOB(X = X, B_true = B_true, function_type = function_type, d = n_nodes, seed = args.random_seed)
 
             elif args.algorithm == "LINEAR_NOTEARS":
                 print('>>> Performing LINEAR_NOTEARS discovery <<<')
-                LINEAR_NOTEARS(X = X, B_true = B_true, function_type = args.function_type, d = n_nodes, seed = args.random_seed)  
+                LINEAR_NOTEARS(X = X, B_true = B_true, function_type = function_type, d = n_nodes, seed = args.random_seed)  
             else:
                 print("Given algorithm is not valid.")
             

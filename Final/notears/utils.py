@@ -152,6 +152,14 @@ def simulate_nonlinear_sem(B, n, sem_type, noise_scale=None):
     Returns:
         X (np.ndarray): [n, d] sample matrix
     """
+    def random_function(index, x):
+        if index == 0:
+            return np.exp(-np.abs(x))
+        elif index == 1:
+            return 0.05*(x**2)
+        else:
+            return np.sin(x)
+        
     def _simulate_single_equation(X, scale):
         """X: [n, num of parents], x: [n]"""
         z = np.random.normal(scale=scale, size=n)
@@ -182,6 +190,16 @@ def simulate_nonlinear_sem(B, n, sem_type, noise_scale=None):
             gp = GaussianProcessRegressor()
             x = sum([gp.sample_y(X[:, i, None], random_state=None).flatten()
                      for i in range(X.shape[1])]) + z
+        elif sem_type == 'kernel':
+            u1 = np.random.random(size=[X.shape[1]])
+            u2 = np.random.random(size=[X.shape[1]])
+            random_integer_1 = np.random.randint(10, 15)
+            random_integer_2 = np.random.randint(10, 20)
+            distance_squared1 = np.linalg.norm(X-u1, axis = 1)**2
+            distance_squared2 = np.linalg.norm(X-u2, axis = 1)**2
+            x = np.exp(-distance_squared1/(16**2)) + z#+ random_integer_2*np.exp(-distance_squared2) + z
+        elif sem_type == "combi":
+            x = sum(random_function(i, X[:, i]) for i in range(X.shape[1])) + z
         else:
             raise ValueError('unknown sem type')
         return x

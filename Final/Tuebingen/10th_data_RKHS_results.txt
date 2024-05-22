@@ -2,20 +2,20 @@
     "W_est_no_thresh": [
         [
             0.0,
-            0.40544760459685364
+            0.13184867291435762
         ],
         [
-            0.0010150083607465758,
+            0.011779589457854026,
             0.0
         ]
     ],
     "threshold_0.005": {
         "valid DAG": "yes",
-        "estimation": "correct"
+        "estimation": "incorrect"
     },
     "threshold_0.01": {
         "valid DAG": "yes",
-        "estimation": "correct"
+        "estimation": "incorrect"
     },
     "threshold_0.05": {
         "valid DAG": "yes",
@@ -26,19 +26,19 @@
         "estimation": "correct"
     },
     "threshold_0.15": {
-        "valid DAG": "yes",
-        "estimation": "correct"
+        "valid DAG": "no",
+        "estimation": "incorrect"
     },
     "threshold_0.2": {
-        "valid DAG": "yes",
-        "estimation": "correct"
+        "valid DAG": "no",
+        "estimation": "incorrect"
     },
     "threshold_0.25": {
-        "valid DAG": "yes",
-        "estimation": "correct"
+        "valid DAG": "no",
+        "estimation": "incorrect"
     },
     "threshold_0.3": {
-        "valid DAG": "yes",
-        "estimation": "correct"
+        "valid DAG": "no",
+        "estimation": "incorrect"
     }
 }

@@ -19,7 +19,7 @@ def NOTEARS_tuebingen_causality(index, lambda1, lambda2, thresh):
     url = 'https://webdav.tuebingen.mpg.de/cause-effect/pair' + str(index).zfill(4) + '.txt'
     response = requests.get(url)
     
-    os.chdir('./Tuebingen')
+    #os.chdir('./Tuebingen')
     causality_df = pd.read_csv('causality_df.csv')
     index_list = causality_df['index'].tolist()
 
@@ -110,11 +110,23 @@ def NOTEARS_tuebingen_causality(index, lambda1, lambda2, thresh):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='Tuebingen Testing by NOTEARS_MLP',)
+    current_directory = os.getcwd()
 
-    parser.add_argument('-i', '--index', type=int)
+    # Print the current working directory
+    print("Current working directory:", current_directory)
+    os.chdir('./Tuebingen')
+    causality_df = pd.read_csv('causality_df.csv')
+    index_list = causality_df['index'].tolist()
+
+    parser.add_argument('-i', '--index', nargs='+', default = index_list, type=int)
     parser.add_argument('-l1', '--lambda1', default=2e-2, type=float)
     parser.add_argument('-l2', '--lambda2', default=0.0, type=float)
     parser.add_argument('-thresh', default=0.3, type=float)
     args = parser.parse_args()
 
-    NOTEARS_tuebingen_causality(args.index, args.lambda1, args.lambda2, args.thresh)
+    for index in index_list:
+        print("Index: ", index)
+        try:
+            NOTEARS_tuebingen_causality(index, args.lambda1, args.lambda2, args.thresh)
+        except Exception as e:
+            print(f"An error occurred with index {index}: {e}")

@@ -18,7 +18,7 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
     url = 'https://webdav.tuebingen.mpg.de/cause-effect/pair' + str(index).zfill(4) + '.txt'
     response = requests.get(url)
 
-    os.chdir('./Tuebingen')
+    #os.chdir('./Tuebingen')
     causality_df = pd.read_csv('causality_df.csv')
     index_list = causality_df['index'].tolist()
 
@@ -34,7 +34,8 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
         content_as_file = StringIO(content)
         
         # Read into a DataFrame assuming the delimiter is a tab. Adjust if necessary.
-        df = pd.read_csv(content_as_file, sep=' ', header=None, names=['X', 'Y'])
+        df = pd.read_csv(content_as_file, sep='  ', header=None, names=['X', 'Y'])
+        print(df)
         scaler = StandardScaler()
         df['X'] = scaler.fit_transform(df[['X']])
         df['Y'] = scaler.fit_transform(df[['Y']])
@@ -55,7 +56,6 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
                 
                 # Calculate the median of x1 in this grid
                 median_x1 = np.median(data_array_sorted[start:end, 0])
-                
                 # We'll take the x2 value corresponding to the median x1 index
                 median_index = start + (end - start) // 2
                 corresponding_x2 = data_array_sorted[median_index, 1]
@@ -65,7 +65,6 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
                 result_array[i, 1] = corresponding_x2
         else:
             result_array = data_array
-
         # Now 'array' is a NumPy array with the data from the text file
         X = torch.tensor(result_array)
         x = result_array[:, 0]
@@ -122,13 +121,24 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='Tuebingen Testing by RKHS',)
+    current_directory = os.getcwd()
 
-    parser.add_argument('-i', '--index', type=int)
+    # Print the current working directory
+    #print("Current working directory:", current_directory)
+    os.chdir('./Tuebingen')
+    causality_df = pd.read_csv('causality_df.csv')
+    index_list = causality_df['index'].tolist()
+
+    parser.add_argument('-i', '--index', nargs='+', default = index_list, type=int)
     parser.add_argument('-l', '--lambda1', default=1e-3, type=float)
     parser.add_argument('-t', '--tau', default=1e-4, type=float)
-    parser.add_argument('-g', '--gamma', default=1, type=int)
+    parser.add_argument('-g', '--gamma', default=0.8, type=int)
     parser.add_argument('-T', default=6, type=int)
     parser.add_argument('-lr', default=0.03, type=float)
     args = parser.parse_args()
 
-    RKHS_tuebingen_causality(args.index, args.lambda1, args.tau, args.gamma, args.T, args.lr)
+    for index in args.index:
+        try:
+            RKHS_tuebingen_causality(index, args.lambda1, args.tau, args.gamma, args.T, args.lr)
+        except Exception as e:
+            print(f"An error occurred with index {index}: {e}")
