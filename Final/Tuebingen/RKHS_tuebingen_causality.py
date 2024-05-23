@@ -34,8 +34,8 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
         content_as_file = StringIO(content)
         
         # Read into a DataFrame assuming the delimiter is a tab. Adjust if necessary.
-        df = pd.read_csv(content_as_file, sep='  ', header=None, names=['X', 'Y'])
-        print(df)
+        df = pd.read_csv(content_as_file, sep=r'\s+', header=None, names=['X', 'Y'])
+        print(df.head())
         scaler = StandardScaler()
         df['X'] = scaler.fit_transform(df[['X']])
         df['Y'] = scaler.fit_transform(df[['Y']])

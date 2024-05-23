@@ -2,10 +2,10 @@
     "W_est_no_thresh": [
         [
             0.0,
-            0.10555204023102087
+            0.04307693813861029
         ],
         [
-            0.008927612433064643,
+            0.07367629805201885,
             0.0
         ]
     ],
@@ -15,15 +15,15 @@
     },
     "threshold_0.01": {
         "valid DAG": "yes",
-        "estimation": "correct"
+        "estimation": "incorrect"
     },
     "threshold_0.05": {
         "valid DAG": "yes",
-        "estimation": "correct"
+        "estimation": "incorrect"
     },
     "threshold_0.1": {
-        "valid DAG": "yes",
-        "estimation": "correct"
+        "valid DAG": "no",
+        "estimation": "incorrect"
     },
     "threshold_0.15": {
         "valid DAG": "no",

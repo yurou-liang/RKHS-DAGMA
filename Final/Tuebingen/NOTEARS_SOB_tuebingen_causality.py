@@ -35,7 +35,7 @@ def NOTEARS_tuebingen_causality(index, lambda1, lambda2, thresh):
         content_as_file = StringIO(content)
         
         # Read into a DataFrame assuming the delimiter is a tab. Adjust if necessary.
-        df = pd.read_csv(content_as_file, sep=' ', header=None, names=['X', 'Y'])
+        df = pd.read_csv(content_as_file, sep=r'\s+', header=None, names=['X', 'Y'])
         scaler = StandardScaler()
         df['X'] = scaler.fit_transform(df[['X']])
         df['Y'] = scaler.fit_transform(df[['Y']])
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument('-thresh', default=0.3, type=float)
     args = parser.parse_args()
 
-    for index in index_list:
+    for index in args.index:
         print("Index: ", index)
         try:
             NOTEARS_tuebingen_causality(index, args.lambda1, args.lambda2, args.thresh)
