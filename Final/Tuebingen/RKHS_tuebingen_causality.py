@@ -1,4 +1,4 @@
-from RKHS import RKHS_DAGMA_extractj
+from RKHS import RKHS_DAGMA
 import torch
 import time
 import numpy as np
@@ -78,8 +78,8 @@ def RKHS_tuebingen_causality(index, lambda1, tau, gamma, T, lr):
     torch.set_default_device(device)
     
     X = X.to(device)
-    eq_model = RKHS_DAGMA_extractj.DagmaRKHS(X, gamma = gamma).to(device)
-    model = RKHS_DAGMA_extractj.DagmaRKHS_nonlinear(eq_model)
+    eq_model = RKHS_DAGMA.RKHSDagma(X, gamma = gamma).to(device)
+    model = RKHS_DAGMA.RKHSDagma_nonlinear(eq_model)
     W_est_no_thresh, output = model.fit(X, lambda1=lambda1, tau=tau, T = T, mu_init = 1.0, lr=lr, w_threshold=0.0)
     result['W_est_no_thresh'] = W_est_no_thresh.tolist()
     causality = causality_df[causality_df['index'] == index]["causality"].item()

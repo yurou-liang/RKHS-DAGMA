@@ -1,5 +1,5 @@
 from experiments import utils
-from RKHS import RKHS_DAGMA_extractj
+from RKHS import RKHS_DAGMA
 import sys
 from notears import NotearsMLP, notears_nonlinear, NotearsSobolev, notears_linear
 import torch
@@ -13,8 +13,8 @@ def RKHS_test(lambda1, tau, X, device, B_true, gamma, function_type, d, seed, th
     results = {}
 
     X = X.to(device)
-    eq_model = RKHS_DAGMA_extractj.DagmaRKHS(X, gamma = gamma).to(device)
-    model = RKHS_DAGMA_extractj.DagmaRKHS_nonlinear(eq_model)
+    eq_model = RKHS_DAGMA.RKHSDagma(X, gamma = gamma).to(device)
+    model = RKHS_DAGMA.RKHSDagma_nonlinear(eq_model)
     x_est_start = eq_model.forward()
     start_mse = eq_model.mse(x_est_start).detach().cpu().numpy()
     W_est_no_thresh, output = model.fit(X, lambda1=lambda1, tau=tau, T = T, mu_init = 1.0, lr=lr, w_threshold=0.0)
