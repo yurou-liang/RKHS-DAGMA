@@ -27,6 +27,9 @@ model = RKHS_DAGMA.RKHSDagma_nonlinear(eq_model)
 
 ## An Overview of RKHS-DAGMA
 We propose a novel approximation method for the non-linear relationships by kernels: Let \( k \) be a given kernel and \( f_j \) denote the non-linear relationship between \( j \)th random variable \( X_j \) with other random variables, to learn a sparse directed acyclic graph, \( f_j \) can be represented by the following formula:
+$$
+x^2
+$$
 
 $$
 \hat{f}_j(x) = \sum_{i = 1}^n \alpha_i k(x, x^i) + \sum_{i = 1}^n \sum_{a = 1}^d \beta_{ai} \frac{\partial k(x, s)}{\partial s^a}\bigg|_{s=x^i}
