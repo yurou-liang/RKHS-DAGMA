@@ -1,1 +1,31 @@
-# Non-parametric-Learning-of-DAG-by-RKHS
+# Kernel-Based Differentiable Learning of Non-Parametric Directed Acyclic Graphical Models
+
+## Contents
+- `RKHS_DAGMA.py` - Supports continuous data for nonlinear models.
+- `Toy_example.py` - Toy example with two nodes and common relationship from quadratic, qubic, inverse or sinus to illustrate RKHS-DAGMA.
+- `Tuebingen` - Experiments of RKHS_DAGMA with real-world bivariate datasets.
+- `experiments` - Experiments of RKHS_DAGMA with simulations compared with NOTEARS algorithms.
+
+## Running a simple demo
+The simplest way to illustrate RKHS-DAGMA is to run a toy example with two nodes where the functional relationship between two nodes is either quadratic, qubic, inverse or sinus:
+
+```bash
+cd RKHS/
+python -m Toy_example -r quadratic
+```
+
+## Using RKHS-DAGMA
+```bash
+# X: Data matrix as a torch.tensor
+device= torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.set_default_device(device)
+torch.set_default_dtype(torch.double)
+X = X.to(device)
+eq_model = RKHS_DAGMA.RKHSDagma(X).to(device)
+model = RKHS_DAGMA.RKHSDagma_nonlinear(eq_model)
+```
+
+## An Overview of RKHS-DAGMA
+We propose a novel approximation method for the non-linear relationships by kernels: Let $k$ be a given kernel anf $f_j$ denote the non-linear relationship between jth random variable $X_j$ with other random variables, to learn a sparse directed acyclic graph, $f_j$ can be represented by the following fomular:
+$\hat{f}_j(x) =
+  \sum_{i = 1}^{n}\alpha_i k(x, x^i) + \sum_{i = 1}^{n} \sum_{a = 1}^{d}\beta_{ai} \frac{\partial k(x, s)}{\partial s^a}\bigg\vert_{s=x^i}.$ 
