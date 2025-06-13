@@ -1,7 +1,7 @@
 # Kernel-Based Differentiable Learning of Non-Parametric Directed Acyclic Graphical Models
 
 If you are interested in the theoretical background, please refer to our paper:  
-[1] Liang, Y., Zadorozhnyi, O., & Drton, M. (2024).  
+Liang, Y., Zadorozhnyi, O., & Drton, M. (2024).  
 [Kernel-Based Differentiable Learning of Non-Parametric Directed Acyclic Graphical Models](https://arxiv.org/abs/2408.10976). 
 [(PGM 2024)](https://proceedings.mlr.press/v246/liang24a.html). 
 
