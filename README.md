@@ -19,7 +19,7 @@ If you are interested in the theoretical background, please refer to our paper:
   url = 	 {https://proceedings.mlr.press/v246/liang24a.html},
   abstract = 	 {Causal discovery amounts to learning a directed acyclic graph (DAG) that encodes a causal model. This model selection problem can be challenging due to its large combinatorial search space, particularly when dealing with non-parametric causal models. Recent research has sought to bypass the combinatorial search by reformulating causal discovery as a continuous optimization problem, employing constraints that ensure the acyclicity of the graph. In non-parametric settings, existing approaches typically rely on finite-dimensional approximations of the relationships between nodes, resulting in a score-based continuous optimization problem with a smooth acyclicity constraint. In this work, we develop an alternative approximation method by utilizing reproducing kernel Hilbert spaces (RKHS) and applying general sparsity-inducing regularization terms based on partial derivatives. Within this framework, we introduce an extended RKHS representer theorem. To enforce acyclicity, we advocate the log-determinant formulation of the acyclicity constraint and show its stability. Finally, we assess the performance of our proposed RKHS-DAGMA procedure through simulations and illustrative data analyses.}
 }
-
+</details>
 
 ## Contents
 - `RKHS_DAGMA.py` - Supports continuous data for nonlinear models.
