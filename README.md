@@ -3,7 +3,7 @@
 If you are interested in the theoretical background, please refer to our paper:  
 [Kernel-Based Differentiable Learning of Non-Parametric Directed Acyclic Graphical Models](https://proceedings.mlr.press/v246/liang24a.html)
 
-<details> <summary>BibTeX</summary>
+```bibtex
 @InProceedings{pmlr-v246-liang24a,
   title = 	 {Kernel-Based Differentiable Learning of Non-Parametric Directed Acyclic Graphical Models},
   author =       {Liang, Yurou and Zadorozhnyi, Oleksandr and Drton, Mathias},
