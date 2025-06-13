@@ -2,8 +2,9 @@
 
 If you are interested in the theoretical background, please refer to our paper:  
 [1] Liang, Y., Zadorozhnyi, O., & Drton, M. (2024).  
-[Kernel-Based Differentiable Learning of Non-Parametric Directed Acyclic Graphical Models](https://proceedings.mlr.press/v246/liang24a.html).  
-*Proceedings of the 12th International Conference on Probabilistic Graphical Models (PGM 2024)*, PMLR 246, pp. 253–272.
+[Kernel-Based Differentiable Learning of Non-Parametric Directed Acyclic Graphical Models](https://arxiv.org/abs/2408.10976). 
+[(PGM 2024)](https://proceedings.mlr.press/v246/liang24a.html). 
+
 
 
 ## Contents
